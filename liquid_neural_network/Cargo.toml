@@ -1,0 +1,13 @@
+[package]
+name = "liquid_neural_network"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ndarray = "0.16.1"
+ndarray-rand = "0.15.0"
+rand = "0.8"
+ode_solvers = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+reqwest = { version = "0.12.7", features = ["json"] }
+tokio = { version = "1.0", features = ["full"] }
