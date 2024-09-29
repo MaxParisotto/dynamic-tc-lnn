@@ -1,7 +1,7 @@
 // src/utils/data_processing.rs
 
 use serde::Deserialize;
-use reqwest::Client; // Use asynchronous Client
+use reqwest::Client;
 use std::collections::HashMap;
 use chrono::NaiveDate;
 use crate::models::MarketData;
@@ -61,8 +61,6 @@ pub async fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::E
 
     Ok(market_data)
 }
-
-// ... (other functions remain unchanged)
 
 /// Calculates features from market data.
 /// Modify this function based on the specific features you want to extract.

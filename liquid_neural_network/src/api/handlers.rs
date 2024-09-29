@@ -21,6 +21,12 @@ pub struct ApiResponse {
 pub async fn get_metrics(data: web::Data<AppStateStruct>) -> impl Responder {
     let metrics = data.metrics.lock().unwrap();
 
+    // Adjusted condition: Check if at least one iteration has occurred
+    if metrics.iteration == 0 {
+        return HttpResponse::BadRequest()
+            .body("Requested application data is not configured correctly. View/enable debug logs for more details.");
+    }
+
     let response = ApiResponse {
         iteration: metrics.iteration,
         mse_a: metrics.mse_a,

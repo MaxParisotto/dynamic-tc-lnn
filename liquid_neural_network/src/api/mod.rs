@@ -1,13 +1,16 @@
 // src/api/mod.rs
 
-use std::sync::{Arc, Mutex};
+use serde::Deserialize;
+use serde::Serialize;
+use std::sync::Mutex;
 use crate::models::Metrics;
 
+// Define AppStateStruct within the api module
 pub struct AppStateStruct {
-    pub metrics: Arc<Mutex<Metrics>>,
+    pub metrics: Mutex<Metrics>,
 }
 
+// Re-export handlers
 pub mod handlers;
 
-// Re-export handlers
 pub use handlers::get_metrics;

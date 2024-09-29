@@ -3,9 +3,6 @@
 use serde::{Deserialize, Serialize};
 use rand::Rng;
 use rand::thread_rng;
-use std::fs::File;
-use std::io::{BufReader, BufWriter};
-use serde_json;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Metrics {
@@ -49,7 +46,6 @@ impl LiquidNeuralNetwork {
         // Implement your training logic here
         // For example, update neuron states, adjust weights, etc.
         // Currently unused variables; implement as needed
-        // _input, _target, _dt, _lr
     }
 
     /// Generates a prediction based on the current state of the network.
@@ -61,17 +57,15 @@ impl LiquidNeuralNetwork {
 
     /// Saves the network state to a file in JSON format.
     pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
-        serde_json::to_writer(writer, self)?;
+        let serialized = serde_json::to_string(self)?;
+        std::fs::write(path, serialized)?;
         Ok(())
     }
 
     /// Loads the network state from a JSON file.
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let network = serde_json::from_reader(reader)?;
+        let data = std::fs::read_to_string(path)?;
+        let network = serde_json::from_str(&data)?;
         Ok(network)
     }
 
