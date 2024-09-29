@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Metrics Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Real-Time Metrics Visualization</h1>
+    <canvas id="mseChart" width="800" height="400"></canvas>
+    <canvas id="maeChart" width="800" height="400"></canvas>
+
+    <script>
+        const mseCtx = document.getElementById('mseChart').getContext('2d');
+        const maeCtx = document.getElementById('maeChart').getContext('2d');
+
+        const mseChart = new Chart(mseCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'MSE',
+                    data: [],
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Iteration'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'MSE'
+                        }
+                    }
+                }
+            }
+        });
+
+        const maeChart = new Chart(maeCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'MAE',
+                    data: [],
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                    fill: true,
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Iteration'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'MAE'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Function to fetch metrics from the API
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('http://127.0.0.1:8080/metrics');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+                return null;
+            }
+        }
+
+        // Function to update charts
+        async function updateCharts() {
+            const metrics = await fetchMetrics();
+            if (metrics) {
+                const { iteration, mse, mae } = metrics;
+
+                // Update MSE Chart
+                mseChart.data.labels.push(iteration);
+                mseChart.data.datasets[0].data.push(mse);
+                mseChart.update();
+
+                // Update MAE Chart
+                maeChart.data.labels.push(iteration);
+                maeChart.data.datasets[0].data.push(mae);
+                maeChart.update();
+            }
+        }
+
+        // Initial chart update
+        updateCharts();
+
+        // Update charts every second
+        setInterval(updateCharts, 1000);
+    </script>
+</body>
+</html>
