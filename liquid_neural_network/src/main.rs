@@ -114,7 +114,7 @@ fn main() {
 
     let mut recent_errors = Vec::new();
     let mut iteration = 0;
-    let max_iterations = 1000; // Set a maximum number of iterations if desired
+    let max_iterations = 1000000; // Set a maximum number of iterations if desired
 
     loop {
         iteration += 1;
