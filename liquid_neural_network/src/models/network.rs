@@ -34,22 +34,52 @@ pub struct Neuron {
     pub weights: Vec<f64>,
 }
 
-// src/models/network.rs
-
 impl LiquidNeuralNetwork {
+    /// Creates a new LiquidNeuralNetwork with the specified number of input features and neurons.
+    pub fn new(input_size: usize, initial_neurons: usize) -> Self {
+        let mut neurons = Vec::new();
+        for _ in 0..initial_neurons {
+            neurons.push(Neuron::new(input_size));
+        }
+        LiquidNeuralNetwork { neurons }
+    }
+
+    /// Trains the network with the given input, target, time step, and learning rate.
     pub fn train(&mut self, _input: &[f64], _target: f64, _dt: f64, _lr: f64) {
         // Implement your training logic here
         // For example, update neuron states, adjust weights, etc.
+        // Currently unused variables; implement as needed
+        // _input, _target, _dt, _lr
     }
 
+    /// Generates a prediction based on the current state of the network.
     pub fn predict(&self) -> f64 {
         // Implement your prediction logic here
         // For example, average neuron outputs
         self.neurons.iter().map(|n| n.state).sum::<f64>() / self.neurons.len() as f64
     }
+
+    /// Saves the network state to a file in JSON format.
+    pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let file = File::create(path)?;
+        let writer = BufWriter::new(file);
+        serde_json::to_writer(writer, self)?;
+        Ok(())
+    }
+
+    /// Loads the network state from a JSON file.
+    pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let network = serde_json::from_reader(reader)?;
+        Ok(network)
+    }
+
+    // Add methods for adjusting neurons based on errors
 }
 
 impl Neuron {
+    /// Creates a new Neuron with randomized weights and bias.
     pub fn new(input_size: usize) -> Self {
         let mut rng = thread_rng();
         let limit = (6.0 / input_size as f64).sqrt(); // Xavier initialization

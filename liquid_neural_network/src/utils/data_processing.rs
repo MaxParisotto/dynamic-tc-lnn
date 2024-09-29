@@ -1,12 +1,10 @@
 // src/utils/data_processing.rs
 
 use serde::Deserialize;
-use reqwest::blocking::Client;
+use reqwest::Client; // Use asynchronous Client
 use std::collections::HashMap;
 use chrono::NaiveDate;
 use crate::models::MarketData;
-
-// Existing structs and functions...
 
 #[derive(Debug, Deserialize)]
 pub struct TimeSeriesEntry {
@@ -26,8 +24,8 @@ pub struct ApiResponse {
     pub time_series: HashMap<String, TimeSeriesEntry>,
 }
 
-// Function to fetch Forex data from Alpha Vantage
-pub fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::Error>> {
+/// Asynchronously fetches Forex data from Alpha Vantage API.
+pub async fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
     let api_key = std::env::var("ALPHAVANTAGE_API_KEY")?;
     let url = format!(
@@ -36,8 +34,8 @@ pub fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::Error>>
     );
 
     let client = Client::new();
-    let response = client.get(&url).send()?;
-    let response_text = response.text()?;
+    let response = client.get(&url).send().await?;
+    let response_text = response.text().await?;
 
     let api_response: ApiResponse = serde_json::from_str(&response_text)?;
 
@@ -64,7 +62,7 @@ pub fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::Error>>
     Ok(market_data)
 }
 
-// **Missing Function Implementations**
+// ... (other functions remain unchanged)
 
 /// Calculates features from market data.
 /// Modify this function based on the specific features you want to extract.
@@ -149,4 +147,15 @@ pub fn calculate_metrics(predictions: &[f64], targets: &[f64]) -> (f64, f64) {
         .sum::<f64>() / predictions.len() as f64;
 
     (mse, mae)
+}
+
+/// Calculates Mean Squared Error between a prediction and target.
+pub fn calculate_mse(prediction: &f64, target: &f64) -> f64 {
+    let error = target - prediction;
+    error.powi(2)
+}
+
+/// Calculates Mean Absolute Error between a prediction and target.
+pub fn calculate_mae(prediction: &f64, target: &f64) -> f64 {
+    (target - prediction).abs()
 }
