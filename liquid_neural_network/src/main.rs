@@ -2,12 +2,14 @@
 
 use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
-use log::{debug, error, info};
+use log::{error, info}; // Removed 'debug' as it's unused in this file
 use std::sync::Mutex;
-use utils::{fetch_forex_data, calculate_features, normalize_features_targets, calculate_mse, calculate_mae};
+use utils::{
+    calculate_features, calculate_mae, calculate_mse, fetch_forex_data, normalize_features_targets,
+};
 use models::{LiquidNeuralNetwork, Metrics};
-use api::get_metrics;
-use api::AppStateStruct;
+use api::{get_metrics, AppStateStruct};
+use rand::prelude::SliceRandom; // Imported SliceRandom for shuffle method
 
 mod models;
 mod api;
@@ -15,7 +17,9 @@ mod utils;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Load environment variables from .env file
     dotenv().ok();
+    // Initialize the logger
     env_logger::init();
 
     // Initialize metrics
@@ -41,16 +45,19 @@ async fn main() -> std::io::Result<()> {
         Ok(data) => {
             info!("Fetched {} market data points.", data.len());
             data
-        },
+        }
         Err(e) => {
             error!("Error fetching Forex data: {}", e);
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to fetch Forex data"));
-        },
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Failed to fetch Forex data",
+            ));
+        }
     };
 
     // Calculate features and normalize
     let features_targets = calculate_features(&market_data);
-    let (normalized_features, normalized_targets) = normalize_features_targets(&features_targets);
+    let (mut normalized_features, normalized_targets) = normalize_features_targets(&features_targets);
 
     info!("Calculated and normalized features.");
 
@@ -65,9 +72,17 @@ async fn main() -> std::io::Result<()> {
 
     info!("Initialized all models.");
 
+    // Initialize history for plotting or further analysis (optional)
+    let mut metrics_history = Vec::new();
+
     // Training loop
     for iteration in 1..=100 {
         info!("Starting iteration {}", iteration);
+
+        // Shuffle data each iteration to ensure random order
+        let mut combined: Vec<(&Vec<f64>, &f64)> =
+            normalized_features.iter().zip(normalized_targets.iter()).collect();
+        combined.shuffle(&mut rand::thread_rng());
 
         let mut total_mse_a = 0.0;
         let mut total_mae_a = 0.0;
@@ -78,12 +93,11 @@ async fn main() -> std::io::Result<()> {
         let mut total_mse_meta = 0.0;
         let mut total_mae_meta = 0.0;
 
-        // Iterate over each data point
-        for (features, target) in normalized_features.iter().zip(normalized_targets.iter()) {
+        for (features, target) in combined.iter() {
             // Train each model
-            model_a.train(features, *target, 0.1, 0.01);
-            model_b.train(features, *target, 0.1, 0.01);
-            model_c.train(features, *target, 0.1, 0.01);
+            model_a.train(features, **target, 0.1, 0.01);
+            model_b.train(features, **target, 0.1, 0.01);
+            model_c.train(features, **target, 0.1, 0.01);
 
             // Generate predictions
             let pred_a = model_a.predict();
@@ -142,6 +156,9 @@ async fn main() -> std::io::Result<()> {
             metrics.mse_meta = avg_mse_meta;
             metrics.mae_meta = avg_mae_meta;
         }
+
+        // Optionally, store metrics for plotting
+        metrics_history.push(app_state.metrics.lock().unwrap().clone());
 
         info!(
             "Iteration {}: MSE_A={:.6}, MAE_A={:.6}, MSE_B={:.6}, MAE_B={:.6}, MSE_C={:.6}, MAE_C={:.6}, MSE_Meta={:.6}, MAE_Meta={:.6}",

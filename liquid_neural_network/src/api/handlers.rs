@@ -3,8 +3,8 @@
 use actix_web::{web, Responder, HttpResponse};
 use serde::Serialize;
 use crate::api::AppStateStruct;
-use crate::models::Metrics;
 
+/// Response structure for the /metrics endpoint
 #[derive(Serialize)]
 pub struct ApiResponse {
     pub iteration: usize,
@@ -18,13 +18,15 @@ pub struct ApiResponse {
     pub mae_meta: f64,
 }
 
+/// Handler for the /metrics endpoint
 pub async fn get_metrics(data: web::Data<AppStateStruct>) -> impl Responder {
     let metrics = data.metrics.lock().unwrap();
 
     // Check if at least one iteration has occurred
     if metrics.iteration < 1 {
-        return HttpResponse::BadRequest()
-            .body("Requested application data is not configured correctly. View/enable debug logs for more details.");
+        return HttpResponse::BadRequest().body(
+            "Requested application data is not configured correctly. View/enable debug logs for more details.",
+        );
     }
 
     let response = ApiResponse {

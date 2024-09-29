@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 use rand::Rng;
 use rand::thread_rng;
+use log::debug; // Imported the debug macro
 
+/// Metrics to track during training
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Metrics {
     pub iteration: usize,
@@ -17,18 +19,20 @@ pub struct Metrics {
     pub mae_meta: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LiquidNeuralNetwork {
-    pub neurons: Vec<Neuron>,
-    // Add other fields as necessary
-}
-
+/// A simple neuron model
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Neuron {
     pub state: f64,
     pub bias: f64,
     pub tau: f64,
     pub weights: Vec<f64>,
+}
+
+/// Liquid Neural Network consisting of multiple neurons
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LiquidNeuralNetwork {
+    pub neurons: Vec<Neuron>,
+    // Add other fields as necessary
 }
 
 impl LiquidNeuralNetwork {
@@ -43,37 +47,47 @@ impl LiquidNeuralNetwork {
 
     /// Trains the network with the given input, target, time step, and learning rate.
     pub fn train(&mut self, input: &[f64], target: f64, dt: f64, lr: f64) {
-        for neuron in &mut self.neurons {
-            // Example: Calculate neuron's output
-            let output: f64 = input.iter().zip(neuron.weights.iter())
-                .map(|(x, w)| x * w)
-                .sum::<f64>() + neuron.bias;
+        for (i, neuron) in self.neurons.iter_mut().enumerate() {
+            // Calculate neuron's raw output
+            let raw_output: f64 =
+                input.iter().zip(neuron.weights.iter()).map(|(x, w)| x * w).sum::<f64>() + neuron.bias;
+            // Apply activation function (ReLU)
+            let output = relu(raw_output);
 
-            // Example: Simple error calculation
+            // Calculate error
             let error = target - output;
 
-            // Update weights and bias using a simple learning rule
+            // Update weights and bias
             for (w, x) in neuron.weights.iter_mut().zip(input.iter()) {
                 *w += lr * error * x;
             }
             neuron.bias += lr * error;
 
-            // Update neuron state based on input and weights
-            neuron.state = output; // Or apply an activation function if needed
+            // Update neuron state
+            neuron.state = output;
+
+            // Log updated weights and bias (debug level)
+            debug!(
+                "Neuron {} - Updated Weights: {:?}, Updated Bias: {:.6}",
+                i, neuron.weights, neuron.bias
+            );
         }
     }
 
     /// Generates a prediction based on the current state of the network.
     pub fn predict(&self) -> f64 {
-        // Example: Average neuron outputs
+        // Average the states of all neurons as the prediction
         self.neurons.iter().map(|n| n.state).sum::<f64>() / self.neurons.len() as f64
     }
 
     /// Generates a prediction based on custom input features.
     pub fn predict_with_input(&self, input: &[f64]) -> f64 {
-        let output: f64 = input.iter().zip(self.neurons.iter())
-            .map(|(x, neuron)| x * neuron.weights[0] + neuron.bias) // Simplified; adjust as needed
-            .sum::<f64>() / self.neurons.len() as f64;
+        let output: f64 = input
+            .iter()
+            .zip(self.neurons.iter())
+            .map(|(x, neuron)| relu(x * neuron.weights[0] + neuron.bias)) // Simplified; adjust as needed
+            .sum::<f64>()
+            / self.neurons.len() as f64;
         output
     }
 
@@ -90,10 +104,21 @@ impl LiquidNeuralNetwork {
         let network = serde_json::from_str(&data)?;
         Ok(network)
     }
-
-    // Add methods for adjusting neurons based on errors
 }
 
+/// Activation functions
+
+/// ReLU activation function
+fn relu(x: f64) -> f64 {
+    if x > 0.0 { x } else { 0.0 }
+}
+
+/// Sigmoid activation function
+fn sigmoid(x: f64) -> f64 {
+    1.0 / (1.0 + (-x).exp())
+}
+
+/// A simple neuron implementation
 impl Neuron {
     /// Creates a new Neuron with randomized weights and bias.
     pub fn new(input_size: usize) -> Self {

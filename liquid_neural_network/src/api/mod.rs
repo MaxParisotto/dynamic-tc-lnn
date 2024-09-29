@@ -5,12 +5,12 @@ use serde::Serialize;
 use std::sync::Mutex;
 use crate::models::Metrics;
 
-// Define AppStateStruct within the api module
+/// Application state structure containing shared metrics
 pub struct AppStateStruct {
     pub metrics: Mutex<Metrics>,
 }
 
-// Re-export handlers
+/// Re-export handlers
 pub mod handlers;
 
 pub use handlers::get_metrics;

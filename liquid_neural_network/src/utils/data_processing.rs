@@ -1,52 +1,36 @@
 // src/utils/data_processing.rs
 
-use serde::Deserialize;
-use reqwest::Client;
-use std::collections::HashMap;
-use chrono::NaiveDate;
 use crate::models::MarketData;
+use chrono::NaiveDate;
+use serde::Deserialize;
+use std::env;
 
-#[derive(Debug, Deserialize)]
-pub struct TimeSeriesEntry {
-    #[serde(rename = "1. open")]
-    pub open: String,
-    #[serde(rename = "2. high")]
-    pub high: String,
-    #[serde(rename = "3. low")]
-    pub low: String,
-    #[serde(rename = "4. close")]
-    pub close: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ApiResponse {
-    #[serde(rename = "Time Series FX (Daily)")]
-    pub time_series: HashMap<String, TimeSeriesEntry>,
-}
-
-/// Asynchronously fetches Forex data from Alpha Vantage API.
+/// Fetches Forex data from the Alpha Vantage API
 pub async fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::Error>> {
-    dotenv::dotenv().ok();
-    let api_key = std::env::var("ALPHAVANTAGE_API_KEY")?;
+    let api_key = env::var("ALPHAVANTAGE_API_KEY")
+        .expect("ALPHAVANTAGE_API_KEY must be set in the environment or .env file");
+
     let url = format!(
-        "https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey={}&outputsize=full",
+        "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=EURUSD&outputsize=full&apikey={}",
         api_key
     );
 
-    let client = Client::new();
-    let response = client.get(&url).send().await?;
-    let response_text = response.text().await?;
+    let resp = reqwest::get(&url).await?;
+    let json: serde_json::Value = resp.json().await?;
 
-    let api_response: ApiResponse = serde_json::from_str(&response_text)?;
+    // Parse JSON response
+    let time_series = json
+        .get("Time Series (Daily)")
+        .ok_or("Missing 'Time Series (Daily)' in response")?;
 
     let mut market_data = Vec::new();
 
-    for (date_str, entry) in api_response.time_series {
-        let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")?;
-        let open = entry.open.parse::<f64>()?;
-        let high = entry.high.parse::<f64>()?;
-        let low = entry.low.parse::<f64>()?;
-        let close = entry.close.parse::<f64>()?;
+    for (date_str, data) in time_series.as_object().unwrap() {
+        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")?;
+        let open = data["1. open"].as_str().unwrap().parse::<f64>()?;
+        let high = data["2. high"].as_str().unwrap().parse::<f64>()?;
+        let low = data["3. low"].as_str().unwrap().parse::<f64>()?;
+        let close = data["4. close"].as_str().unwrap().parse::<f64>()?;
 
         market_data.push(MarketData {
             date,
@@ -57,21 +41,21 @@ pub async fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::E
         });
     }
 
-    market_data.sort_by_key(|data| data.date);
+    // Sort data by date ascending
+    market_data.sort_by_key(|d| d.date);
 
     Ok(market_data)
 }
 
-/// Calculates features from market data.
-/// Modify this function based on the specific features you want to extract.
+/// Calculates features and targets from market data
 pub fn calculate_features(market_data: &[MarketData]) -> Vec<(Vec<f64>, f64)> {
     let mut features_targets = Vec::new();
 
-    for data in market_data.windows(2) {
-        if let [prev, current] = data {
+    for window in market_data.windows(2) {
+        if let [prev, current] = window {
             // Example Feature: Price change
             let price_change = current.close - prev.close;
-            // Features could include more indicators like moving averages, RSI, etc.
+            // Additional features can be added here
             let features = vec![price_change];
             let target = current.close;
             features_targets.push((features, target));
@@ -81,79 +65,68 @@ pub fn calculate_features(market_data: &[MarketData]) -> Vec<(Vec<f64>, f64)> {
     features_targets
 }
 
-/// Normalizes features and targets.
-/// This example normalizes features to have zero mean and unit variance.
-pub fn normalize_features_targets(features_targets: &[(Vec<f64>, f64)]) -> (Vec<Vec<f64>>, Vec<f64>) {
-    let feature_length = features_targets[0].0.len();
-    let mut means = vec![0.0; feature_length];
-    let mut variances = vec![0.0; feature_length];
-
-    // Calculate means
-    for (features, _) in features_targets {
-        for i in 0..feature_length {
-            means[i] += features[i];
-        }
-    }
-    for mean in &mut means {
-        *mean /= features_targets.len() as f64;
-    }
-
-    // Calculate variances
-    for (features, _) in features_targets {
-        for i in 0..feature_length {
-            variances[i] += (features[i] - means[i]).powi(2);
-        }
-    }
-    for variance in &mut variances {
-        *variance /= features_targets.len() as f64;
-        if *variance == 0.0 {
-            *variance = 1.0; // Prevent division by zero
-        }
-    }
-
-    // Normalize features
+/// Normalizes features and targets using min-max scaling
+pub fn normalize_features_targets(
+    features_targets: &[(Vec<f64>, f64)],
+) -> (Vec<Vec<f64>>, Vec<f64>) {
     let mut normalized_features = Vec::new();
     let mut normalized_targets = Vec::new();
 
+    // For simplicity, perform min-max normalization on features and targets separately
+    let feature_length = features_targets[0].0.len();
+
+    // Initialize min and max vectors
+    let mut feature_min = vec![f64::INFINITY; feature_length];
+    let mut feature_max = vec![f64::NEG_INFINITY; feature_length];
+    let mut target_min = f64::INFINITY;
+    let mut target_max = f64::NEG_INFINITY;
+
+    // Find min and max for each feature and target
     for (features, target) in features_targets {
-        let mut normalized = Vec::new();
-        for i in 0..feature_length {
-            normalized.push((features[i] - means[i]) / variances[i].sqrt());
+        for (i, feature) in features.iter().enumerate() {
+            if *feature < feature_min[i] {
+                feature_min[i] = *feature;
+            }
+            if *feature > feature_max[i] {
+                feature_max[i] = *feature;
+            }
+        }
+        if *target < target_min {
+            target_min = *target;
+        }
+        if *target > target_max {
+            target_max = *target;
+        }
+    }
+
+    // Normalize features and targets
+    for (features, target) in features_targets {
+        let mut normalized = Vec::with_capacity(feature_length);
+        for (i, feature) in features.iter().enumerate() {
+            if (feature_max[i] - feature_min[i]).abs() < std::f64::EPSILON {
+                normalized.push(0.0); // Avoid division by zero
+            } else {
+                normalized.push((feature - feature_min[i]) / (feature_max[i] - feature_min[i]));
+            }
         }
         normalized_features.push(normalized);
-        normalized_targets.push(*target);
+
+        if (target_max - target_min).abs() < std::f64::EPSILON {
+            normalized_targets.push(0.0);
+        } else {
+            normalized_targets.push((target - target_min) / (target_max - target_min));
+        }
     }
 
     (normalized_features, normalized_targets)
 }
 
-/// Calculates the average of a slice of f64 values.
-pub fn average(data: &[f64]) -> f64 {
-    data.iter().sum::<f64>() / data.len() as f64
-}
-
-/// Calculates Mean Squared Error and Mean Absolute Error.
-pub fn calculate_metrics(predictions: &[f64], targets: &[f64]) -> (f64, f64) {
-    let mse = predictions.iter()
-        .zip(targets.iter())
-        .map(|(p, t)| (t - p).powi(2))
-        .sum::<f64>() / predictions.len() as f64;
-
-    let mae = predictions.iter()
-        .zip(targets.iter())
-        .map(|(p, t)| (t - p).abs())
-        .sum::<f64>() / predictions.len() as f64;
-
-    (mse, mae)
-}
-
-/// Calculates Mean Squared Error between a prediction and target.
+/// Calculates Mean Squared Error between prediction and target
 pub fn calculate_mse(prediction: &f64, target: &f64) -> f64 {
-    let error = target - prediction;
-    error.powi(2)
+    (*prediction - *target).powi(2)
 }
 
-/// Calculates Mean Absolute Error between a prediction and target.
+/// Calculates Mean Absolute Error between prediction and target
 pub fn calculate_mae(prediction: &f64, target: &f64) -> f64 {
-    (target - prediction).abs()
+    (*prediction - *target).abs()
 }
