@@ -65,25 +65,88 @@ async fn main() -> std::io::Result<()> {
 
     info!("Initialized all models.");
 
-    // Training loop (start from 1 to avoid iteration = 0)
+    // Training loop
     for iteration in 1..=100 {
-        // Example training logic
-        // Update models, calculate errors, update metrics...
+        info!("Starting iteration {}", iteration);
 
-        // For demonstration, we'll skip actual training logic
-        // Update metrics with dummy values
+        let mut total_mse_a = 0.0;
+        let mut total_mae_a = 0.0;
+        let mut total_mse_b = 0.0;
+        let mut total_mae_b = 0.0;
+        let mut total_mse_c = 0.0;
+        let mut total_mae_c = 0.0;
+        let mut total_mse_meta = 0.0;
+        let mut total_mae_meta = 0.0;
+
+        // Iterate over each data point
+        for (features, target) in normalized_features.iter().zip(normalized_targets.iter()) {
+            // Train each model
+            model_a.train(features, *target, 0.1, 0.01);
+            model_b.train(features, *target, 0.1, 0.01);
+            model_c.train(features, *target, 0.1, 0.01);
+
+            // Generate predictions
+            let pred_a = model_a.predict();
+            let pred_b = model_b.predict();
+            let pred_c = model_c.predict();
+
+            // Aggregate predictions for meta-model (simple average)
+            let meta_input = vec![pred_a, pred_b, pred_c];
+            let pred_meta = meta_model.predict_with_input(&meta_input);
+
+            // Calculate errors
+            let mse_a = calculate_mse(&pred_a, target);
+            let mae_a = calculate_mae(&pred_a, target);
+
+            let mse_b = calculate_mse(&pred_b, target);
+            let mae_b = calculate_mae(&pred_b, target);
+
+            let mse_c = calculate_mse(&pred_c, target);
+            let mae_c = calculate_mae(&pred_c, target);
+
+            let mse_meta = calculate_mse(&pred_meta, target);
+            let mae_meta = calculate_mae(&pred_meta, target);
+
+            // Accumulate errors
+            total_mse_a += mse_a;
+            total_mae_a += mae_a;
+            total_mse_b += mse_b;
+            total_mae_b += mae_b;
+            total_mse_c += mse_c;
+            total_mae_c += mae_c;
+            total_mse_meta += mse_meta;
+            total_mae_meta += mae_meta;
+        }
+
+        // Calculate average errors for this iteration
+        let data_len = normalized_features.len() as f64;
+        let avg_mse_a = total_mse_a / data_len;
+        let avg_mae_a = total_mae_a / data_len;
+        let avg_mse_b = total_mse_b / data_len;
+        let avg_mae_b = total_mae_b / data_len;
+        let avg_mse_c = total_mse_c / data_len;
+        let avg_mae_c = total_mae_c / data_len;
+        let avg_mse_meta = total_mse_meta / data_len;
+        let avg_mae_meta = total_mae_meta / data_len;
+
+        // Update metrics
         {
             let mut metrics = app_state.metrics.lock().unwrap();
             metrics.iteration = iteration;
-            metrics.mse_a += 0.001;
-            metrics.mae_a += 0.0005;
-            metrics.mse_b += 0.0012;
-            metrics.mae_b += 0.0006;
-            metrics.mse_c += 0.0008;
-            metrics.mae_c += 0.0004;
-            metrics.mse_meta += 0.001;
-            metrics.mae_meta += 0.0005;
+            metrics.mse_a = avg_mse_a;
+            metrics.mae_a = avg_mae_a;
+            metrics.mse_b = avg_mse_b;
+            metrics.mae_b = avg_mae_b;
+            metrics.mse_c = avg_mse_c;
+            metrics.mae_c = avg_mae_c;
+            metrics.mse_meta = avg_mse_meta;
+            metrics.mae_meta = avg_mae_meta;
         }
+
+        info!(
+            "Iteration {}: MSE_A={:.6}, MAE_A={:.6}, MSE_B={:.6}, MAE_B={:.6}, MSE_C={:.6}, MAE_C={:.6}, MSE_Meta={:.6}, MAE_Meta={:.6}",
+            iteration, avg_mse_a, avg_mae_a, avg_mse_b, avg_mae_b, avg_mse_c, avg_mae_c, avg_mse_meta, avg_mae_meta
+        );
 
         // Periodically save models
         if iteration % 10 == 0 {

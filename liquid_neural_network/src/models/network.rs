@@ -42,17 +42,39 @@ impl LiquidNeuralNetwork {
     }
 
     /// Trains the network with the given input, target, time step, and learning rate.
-    pub fn train(&mut self, _input: &[f64], _target: f64, _dt: f64, _lr: f64) {
-        // Implement your training logic here
-        // For example, update neuron states, adjust weights, etc.
-        // Currently unused variables; implement as needed
+    pub fn train(&mut self, input: &[f64], target: f64, dt: f64, lr: f64) {
+        for neuron in &mut self.neurons {
+            // Example: Calculate neuron's output
+            let output: f64 = input.iter().zip(neuron.weights.iter())
+                .map(|(x, w)| x * w)
+                .sum::<f64>() + neuron.bias;
+
+            // Example: Simple error calculation
+            let error = target - output;
+
+            // Update weights and bias using a simple learning rule
+            for (w, x) in neuron.weights.iter_mut().zip(input.iter()) {
+                *w += lr * error * x;
+            }
+            neuron.bias += lr * error;
+
+            // Update neuron state based on input and weights
+            neuron.state = output; // Or apply an activation function if needed
+        }
     }
 
     /// Generates a prediction based on the current state of the network.
     pub fn predict(&self) -> f64 {
-        // Implement your prediction logic here
-        // For example, average neuron outputs
+        // Example: Average neuron outputs
         self.neurons.iter().map(|n| n.state).sum::<f64>() / self.neurons.len() as f64
+    }
+
+    /// Generates a prediction based on custom input features.
+    pub fn predict_with_input(&self, input: &[f64]) -> f64 {
+        let output: f64 = input.iter().zip(self.neurons.iter())
+            .map(|(x, neuron)| x * neuron.weights[0] + neuron.bias) // Simplified; adjust as needed
+            .sum::<f64>() / self.neurons.len() as f64;
+        output
     }
 
     /// Saves the network state to a file in JSON format.
