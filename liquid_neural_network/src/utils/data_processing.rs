@@ -1,10 +1,13 @@
 // src/utils/data_processing.rs
 
-use serde::{Deserialize};
+use serde::Deserialize;
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 use chrono::NaiveDate;
-use crate::models::{MarketData};
+use crate::models::MarketData;
+
+use plotters::prelude::*;
+use plotters::series::LineSeries;
 use plotters::drawing::IntoDrawingArea;
 
 // Define the structure for time series entries from the API
