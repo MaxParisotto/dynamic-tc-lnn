@@ -6,11 +6,8 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 use crate::models::MarketData;
 
-use plotters::prelude::*;
-use plotters::series::LineSeries;
-use plotters::drawing::IntoDrawingArea;
+// Existing structs and functions...
 
-// Define the structure for time series entries from the API
 #[derive(Debug, Deserialize)]
 pub struct TimeSeriesEntry {
     #[serde(rename = "1. open")]
@@ -23,7 +20,6 @@ pub struct TimeSeriesEntry {
     pub close: String,
 }
 
-// Define the structure for the API response
 #[derive(Debug, Deserialize)]
 pub struct ApiResponse {
     #[serde(rename = "Time Series FX (Daily)")]
@@ -68,179 +64,89 @@ pub fn fetch_forex_data() -> Result<Vec<MarketData>, Box<dyn std::error::Error>>
     Ok(market_data)
 }
 
-// Function to calculate features and targets
-pub fn calculate_features(data: &[MarketData]) -> Vec<(Vec<f64>, f64)> {
+// **Missing Function Implementations**
+
+/// Calculates features from market data.
+/// Modify this function based on the specific features you want to extract.
+pub fn calculate_features(market_data: &[MarketData]) -> Vec<(Vec<f64>, f64)> {
     let mut features_targets = Vec::new();
 
-    // Ensure there is enough data
-    if data.len() < 6 {
-        return features_targets; // Not enough data to compute features
-    }
-
-    for i in 6..data.len() {
-        let mut input_features = Vec::new();
-        for j in (i - 5)..i {
-            // Safely calculate percentage changes
-            let pct_change_open = if data[j - 1].open != 0.0 {
-                (data[j].open - data[j - 1].open) / data[j - 1].open
-            } else {
-                0.0
-            };
-
-            let pct_change_high = if data[j - 1].high != 0.0 {
-                (data[j].high - data[j - 1].high) / data[j - 1].high
-            } else {
-                0.0
-            };
-
-            let pct_change_low = if data[j - 1].low != 0.0 {
-                (data[j].low - data[j - 1].low) / data[j - 1].low
-            } else {
-                0.0
-            };
-
-            let pct_change_close = if data[j - 1].close != 0.0 {
-                (data[j].close - data[j - 1].close) / data[j - 1].close
-            } else {
-                0.0
-            };
-
-            input_features.extend_from_slice(&[
-                pct_change_open,
-                pct_change_high,
-                pct_change_low,
-                pct_change_close,
-            ]);
+    for data in market_data.windows(2) {
+        if let [prev, current] = data {
+            // Example Feature: Price change
+            let price_change = current.close - prev.close;
+            // Features could include more indicators like moving averages, RSI, etc.
+            let features = vec![price_change];
+            let target = current.close;
+            features_targets.push((features, target));
         }
-
-        // Target: Next day's percentage change in close price
-        let target_pct_change = if data[i - 1].close != 0.0 {
-            (data[i].close - data[i - 1].close) / data[i - 1].close
-        } else {
-            0.0
-        };
-        let target = target_pct_change;
-
-        features_targets.push((input_features, target));
     }
 
     features_targets
 }
 
-// Function to normalize features and targets
-pub fn normalize_features_targets(
-    features_targets: &[(Vec<f64>, f64)],
-) -> (Vec<Vec<f64>>, Vec<f64>) {
-    let mut features_matrix = Vec::new();
-    let mut targets = Vec::new();
+/// Normalizes features and targets.
+/// This example normalizes features to have zero mean and unit variance.
+pub fn normalize_features_targets(features_targets: &[(Vec<f64>, f64)]) -> (Vec<Vec<f64>>, Vec<f64>) {
+    let feature_length = features_targets[0].0.len();
+    let mut means = vec![0.0; feature_length];
+    let mut variances = vec![0.0; feature_length];
 
-    for (features, target) in features_targets {
-        features_matrix.push(features.clone());
-        targets.push(*target);
+    // Calculate means
+    for (features, _) in features_targets {
+        for i in 0..feature_length {
+            means[i] += features[i];
+        }
+    }
+    for mean in &mut means {
+        *mean /= features_targets.len() as f64;
     }
 
-    // Flatten features for normalization
-    let all_features: Vec<f64> = features_matrix.iter().flatten().cloned().collect();
-
-    // Calculate mean and standard deviation
-    let mean = all_features.iter().sum::<f64>() / all_features.len() as f64;
-    let std_dev = (all_features
-        .iter()
-        .map(|x| (x - mean).powi(2))
-        .sum::<f64>()
-        / all_features.len() as f64)
-        .sqrt();
-
-    // Avoid division by zero
-    let std_dev = if std_dev == 0.0 { 1.0 } else { std_dev };
+    // Calculate variances
+    for (features, _) in features_targets {
+        for i in 0..feature_length {
+            variances[i] += (features[i] - means[i]).powi(2);
+        }
+    }
+    for variance in &mut variances {
+        *variance /= features_targets.len() as f64;
+        if *variance == 0.0 {
+            *variance = 1.0; // Prevent division by zero
+        }
+    }
 
     // Normalize features
-    let normalized_features: Vec<Vec<f64>> = features_matrix
-        .iter()
-        .map(|features| {
-            features
-                .iter()
-                .map(|x| (x - mean) / std_dev)
-                .collect::<Vec<f64>>()
-        })
-        .collect();
+    let mut normalized_features = Vec::new();
+    let mut normalized_targets = Vec::new();
 
-    // Normalize targets
-    let target_mean = targets.iter().sum::<f64>() / targets.len() as f64;
-    let target_std_dev = (targets
-        .iter()
-        .map(|x| (x - target_mean).powi(2))
-        .sum::<f64>()
-        / targets.len() as f64)
-        .sqrt();
-    let target_std_dev = if target_std_dev == 0.0 { 1.0 } else { target_std_dev };
-    let normalized_targets: Vec<f64> = targets
-        .iter()
-        .map(|x| (x - target_mean) / target_std_dev)
-        .collect();
+    for (features, target) in features_targets {
+        let mut normalized = Vec::new();
+        for i in 0..feature_length {
+            normalized.push((features[i] - means[i]) / variances[i].sqrt());
+        }
+        normalized_features.push(normalized);
+        normalized_targets.push(*target);
+    }
 
     (normalized_features, normalized_targets)
 }
 
-// Function to calculate the average of a slice of f64
-pub fn average(errors: &[f64]) -> f64 {
-    errors.iter().sum::<f64>() / errors.len() as f64
+/// Calculates the average of a slice of f64 values.
+pub fn average(data: &[f64]) -> f64 {
+    data.iter().sum::<f64>() / data.len() as f64
 }
 
-// Function to calculate MSE and MAE
+/// Calculates Mean Squared Error and Mean Absolute Error.
 pub fn calculate_metrics(predictions: &[f64], targets: &[f64]) -> (f64, f64) {
-    let mse = predictions
-        .iter()
-        .zip(targets)
-        .map(|(pred, target)| (pred - target).powi(2))
-        .sum::<f64>()
-        / predictions.len() as f64;
+    let mse = predictions.iter()
+        .zip(targets.iter())
+        .map(|(p, t)| (t - p).powi(2))
+        .sum::<f64>() / predictions.len() as f64;
 
-    let mae = predictions
-        .iter()
-        .zip(targets)
-        .map(|(pred, target)| (pred - target).abs())
-        .sum::<f64>()
-        / predictions.len() as f64;
+    let mae = predictions.iter()
+        .zip(targets.iter())
+        .map(|(p, t)| (t - p).abs())
+        .sum::<f64>() / predictions.len() as f64;
 
     (mse, mae)
-}
-
-// Function to plot metrics (optional, can be removed if only using API)
-#[allow(dead_code)]
-pub fn plot_metrics(
-    metric_history: &[f64],
-    metric_name: &str,
-    filename: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Specify the PixelFormat as RGBPixel
-    let root_area = plotters::prelude::SVGBackend::new(filename, (800, 600)).into_drawing_area();
-    root_area.fill(&plotters::prelude::WHITE)?;
-
-    let max_value = metric_history.iter().cloned().fold(f64::MIN, f64::max);
-    let min_value = metric_history.iter().cloned().fold(f64::MAX, f64::min);
-
-    let y_range = if (max_value - min_value).abs() < std::f64::EPSILON {
-        // If all values are the same, set a default range
-        (min_value - 1.0)..(max_value + 1.0)
-    } else {
-        min_value..max_value
-    };
-
-    let mut chart = plotters::prelude::ChartBuilder::on(&root_area)
-        .caption(format!("{} Over Iterations", metric_name), ("sans-serif", 40))
-        .margin(10)
-        .x_label_area_size(40)
-        .y_label_area_size(60)
-        .build_cartesian_2d(0..metric_history.len(), y_range)?;
-    chart.configure_mesh().draw()?;
-    chart
-        .draw_series(plotters::prelude::LineSeries::new(
-            metric_history.iter().enumerate().map(|(x, y)| (x, *y)),
-            &plotters::prelude::RED,
-        ))?
-        .label(metric_name)
-        .legend(|(x, y)| plotters::prelude::PathElement::new(vec![(x, y), (x + 20, y)], &plotters::prelude::RED));
-    chart.configure_series_labels().draw()?;
-    Ok(())
 }

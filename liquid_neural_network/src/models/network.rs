@@ -8,6 +8,19 @@ use std::io::{BufReader, BufWriter};
 use serde_json;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Metrics {
+    pub iteration: usize,
+    pub mse_a: f64,
+    pub mae_a: f64,
+    pub mse_b: f64,
+    pub mae_b: f64,
+    pub mse_c: f64,
+    pub mae_c: f64,
+    pub mse_meta: f64,
+    pub mae_meta: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiquidNeuralNetwork {
     pub neurons: Vec<Neuron>,
     // Add other fields as necessary
@@ -21,41 +34,19 @@ pub struct Neuron {
     pub weights: Vec<f64>,
 }
 
-impl LiquidNeuralNetwork {
-    pub fn new(input_size: usize, initial_neurons: usize) -> Self {
-        let mut neurons = Vec::new();
-        for _ in 0..initial_neurons {
-            neurons.push(Neuron::new(input_size));
-        }
-        LiquidNeuralNetwork { neurons }
-    }
+// src/models/network.rs
 
-    pub fn train(&mut self, input: &[f64], target: f64, dt: f64, lr: f64) {
-        // Implement your training logic
+impl LiquidNeuralNetwork {
+    pub fn train(&mut self, _input: &[f64], _target: f64, _dt: f64, _lr: f64) {
+        // Implement your training logic here
         // For example, update neuron states, adjust weights, etc.
     }
 
     pub fn predict(&self) -> f64 {
-        // Implement your prediction logic
+        // Implement your prediction logic here
         // For example, average neuron outputs
         self.neurons.iter().map(|n| n.state).sum::<f64>() / self.neurons.len() as f64
     }
-
-    pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
-        serde_json::to_writer(writer, self)?;
-        Ok(())
-    }
-
-    pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let network = serde_json::from_reader(reader)?;
-        Ok(network)
-    }
-
-    // Add methods for adjusting neurons based on errors
 }
 
 impl Neuron {

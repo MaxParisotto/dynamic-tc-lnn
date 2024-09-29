@@ -8,4 +8,7 @@ pub use data_processing::{
     normalize_features_targets,
     average,
     calculate_metrics,
+    calculate_mse,
+    calculate_mae,
+    // plot_metrics, // Uncomment if implemented
 };

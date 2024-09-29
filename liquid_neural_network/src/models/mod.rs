@@ -14,4 +14,5 @@ pub struct MarketData {
     pub close: f64,
 }
 
+// Re-export network components
 pub use network::{LiquidNeuralNetwork, Metrics};

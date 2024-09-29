@@ -2,7 +2,7 @@
 
 use actix_web::{web, Responder, HttpResponse};
 use serde::Serialize;
-use std::sync::{Arc, Mutex};
+use crate::api::AppStateStruct;
 use crate::models::Metrics;
 
 #[derive(Serialize)]

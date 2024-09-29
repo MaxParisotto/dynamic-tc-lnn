@@ -8,3 +8,6 @@ pub struct AppStateStruct {
 }
 
 pub mod handlers;
+
+// Re-export handlers
+pub use handlers::get_metrics;

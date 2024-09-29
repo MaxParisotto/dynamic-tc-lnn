@@ -14,7 +14,7 @@ mod utils;
 
 use api::{AppStateStruct, get_metrics};
 use models::{LiquidNeuralNetwork, Metrics};
-use utils::{fetch_forex_data, calculate_features, normalize_features_targets, average, calculate_metrics};
+use utils::{fetch_forex_data, calculate_features, normalize_features_targets, average, calculate_metrics, calculate_mse, calculate_mae};
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -32,6 +32,7 @@ async fn main() -> Result<(), std::io::Error> {
             return Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to fetch Forex data"));
         }
     };
+
     let features_targets = calculate_features(&market_data);
     let (inputs, targets) = normalize_features_targets(&features_targets);
 
@@ -57,18 +58,7 @@ async fn main() -> Result<(), std::io::Error> {
     let mut model_c = LiquidNeuralNetwork::new(input_size, initial_neurons);
     let mut meta_model = LiquidNeuralNetwork::new(3, initial_neurons); // Meta-model with 3 inputs
 
-    let mut recent_errors = Vec::new();
     let mut iteration = 0;
-
-    // Initialize metric history vectors
-    let mut mse_history_a = Vec::new();
-    let mut mae_history_a = Vec::new();
-    let mut mse_history_b = Vec::new();
-    let mut mae_history_b = Vec::new();
-    let mut mse_history_c = Vec::new();
-    let mut mae_history_c = Vec::new();
-    let mut mse_history_meta = Vec::new();
-    let mut mae_history_meta = Vec::new();
 
     // Initialize shared metrics state
     let metrics = Arc::new(Mutex::new(Metrics {
@@ -97,7 +87,12 @@ async fn main() -> Result<(), std::io::Error> {
         loop {
             iteration += 1;
 
-            // Example input for training
+            // Ensure we don't exceed the training data
+            if iteration > train_inputs_clone.len() {
+                info!("Reached end of training data.");
+                break;
+            }
+
             let input = &train_inputs_clone[iteration - 1];
             let target = train_targets_clone[iteration - 1];
 
@@ -116,43 +111,35 @@ async fn main() -> Result<(), std::io::Error> {
             let error_b = target - pred_b;
             let error_c = target - pred_c;
 
-            // Collect errors
+            // Collect errors for meta-model input
             let combined_errors = vec![error_a, error_b, error_c];
 
             // Train meta-model on the errors
-            meta_model.train(&combined_errors, 0.0, dt, learning_rate); // Assuming meta_target is 0
+            let meta_target = 0.0; // Define as needed
+            meta_model.train(&combined_errors, meta_target, dt, learning_rate);
 
             // Calculate and record metrics
-            let mse_a = calculate_mse(&pred_a, &target);
-            let mae_a = calculate_mae(&pred_a, &target);
-            let mse_b = calculate_mse(&pred_b, &target);
-            let mae_b = calculate_mae(&pred_b, &target);
-            let mse_c = calculate_mse(&pred_c, &target);
-            let mae_c = calculate_mae(&pred_c, &target);
-            let mse_meta = calculate_mse(&meta_model.predict(), &0.0); // Assuming meta_target is 0
-            let mae_meta = calculate_mae(&meta_model.predict(), &0.0);
-
-            mse_history_a.push(mse_a);
-            mae_history_a.push(mae_a);
-            mse_history_b.push(mse_b);
-            mae_history_b.push(mae_b);
-            mse_history_c.push(mse_c);
-            mae_history_c.push(mae_c);
-            mse_history_meta.push(mse_meta);
-            mae_history_meta.push(mae_meta);
+            let mse_a_val = calculate_mse(&pred_a, &target);
+            let mae_a_val = calculate_mae(&pred_a, &target);
+            let mse_b_val = calculate_mse(&pred_b, &target);
+            let mae_b_val = calculate_mae(&pred_b, &target);
+            let mse_c_val = calculate_mse(&pred_c, &target);
+            let mae_c_val = calculate_mae(&pred_c, &target);
+            let mse_meta_val = calculate_mse(&meta_model.predict(), &meta_target);
+            let mae_meta_val = calculate_mae(&meta_model.predict(), &meta_target);
 
             // Update shared metrics state
             {
                 let mut metrics_lock = metrics_clone.lock().unwrap();
                 metrics_lock.iteration = iteration;
-                metrics_lock.mse_a = mse_a;
-                metrics_lock.mae_a = mae_a;
-                metrics_lock.mse_b = mse_b;
-                metrics_lock.mae_b = mae_b;
-                metrics_lock.mse_c = mse_c;
-                metrics_lock.mae_c = mae_c;
-                metrics_lock.mse_meta = mse_meta;
-                metrics_lock.mae_meta = mae_meta;
+                metrics_lock.mse_a = mse_a_val;
+                metrics_lock.mae_a = mae_a_val;
+                metrics_lock.mse_b = mse_b_val;
+                metrics_lock.mae_b = mae_b_val;
+                metrics_lock.mse_c = mse_c_val;
+                metrics_lock.mae_c = mae_c_val;
+                metrics_lock.mse_meta = mse_meta_val;
+                metrics_lock.mae_meta = mae_meta_val;
             }
 
             // Save models periodically
@@ -175,7 +162,7 @@ async fn main() -> Result<(), std::io::Error> {
             // Logging
             info!(
                 "Iteration {}: Training - MSE_A: {:.6}, MAE_A: {:.6}, MSE_B: {:.6}, MAE_B: {:.6}, MSE_C: {:.6}, MAE_C: {:.6}, MSE_Meta: {:.6}, MAE_Meta: {:.6}",
-                iteration, mse_a, mae_a, mse_b, mae_b, mse_c, mae_c, mse_meta, mae_meta
+                iteration, mse_a_val, mae_a_val, mse_b_val, mae_b_val, mse_c_val, mae_c_val, mse_meta_val, mae_meta_val
             );
 
             // Break condition
@@ -186,7 +173,7 @@ async fn main() -> Result<(), std::io::Error> {
         }
 
         // Optionally, evaluate on test data
-        // ... evaluation logic ...
+        // Implement as needed
     });
 
     // Set up Actix-web server
