@@ -4,72 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic TC-LNN Frontend</title>
-    <!-- Tabler Core CSS -->
     <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler.min.css">
-    <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler-flags.min.css">
-    <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler-payments.min.css">
-    <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler-vendors.min.css">
+    <script src="node_modules/chart.js/dist/chart.min.js"></script>
 </head>
 <body>
     <div class="page">
         <div class="page-wrapper">
             <div class="container-xl">
-                <div class="page-header">
-                    <h1 class="page-title">Dynamic TC-LNN Dashboard</h1>
-                    <div class="page-subtitle">Real-time metrics fetched from the Rust backend</div>
-                </div>
-                
-                <!-- Card to display metrics -->
-                <div class="row row-cards">
-                    <div class="col-sm-6 col-lg-4">
-                        <div class="card">
-                            <div class="card-body">
-                                <h3 class="card-title">Metrics</h3>
-                                <p>Click below to fetch real-time metrics.</p>
-                                <button class="btn btn-primary" id="fetch-data">Fetch Data</button>
-                                <div id="data-output" class="mt-3">
-                                    <div id="metrics-placeholder">Metrics will appear here...</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Display a loading spinner while fetching data -->
-                <div id="loading-spinner" class="spinner-border text-primary" style="display: none;" role="status">
-                    <span class="sr-only">Loading...</span>
-                </div>
-                
-                <!-- Add additional sections or cards here for future features -->
+                <h1>Training Metrics</h1>
+                <canvas id="metricsChart"></canvas>
             </div>
         </div>
     </div>
 
-    <!-- Tabler Core JS -->
-    <script src="node_modules/@tabler/core/dist/js/tabler.min.js"></script>
-    
-    <!-- Add custom JavaScript -->
     <script>
-        document.getElementById('fetch-data').addEventListener('click', () => {
-            const dataOutput = document.getElementById('data-output');
-            const spinner = document.getElementById('loading-spinner');
-            spinner.style.display = 'block'; // Show spinner during fetch
-            dataOutput.innerHTML = ''; // Clear previous data
-            
-            fetch('http://127.0.0.1:8080/metrics')  // Replace with your Rust backend API endpoint
-                .then(response => response.json())
-                .then(data => {
-                    spinner.style.display = 'none'; // Hide spinner once data is fetched
-                    dataOutput.innerHTML = `
-                        <p><strong>MSE:</strong> ${data.mse}</p>
-                        <p><strong>MAE:</strong> ${data.mae}</p>
-                    `;
-                })
-                .catch(err => {
-                    spinner.style.display = 'none'; // Hide spinner if there's an error
-                    dataOutput.innerHTML = `<p class="text-danger">Error fetching data: ${err}</p>`;
-                });
+        // Connect to WebSocket
+        const socket = new WebSocket("ws://127.0.0.1:8080/metrics_ws");
+
+        socket.onopen = function() {
+            console.log('WebSocket connection established');
+        };
+
+        socket.onerror = function(error) {
+            console.log('WebSocket Error: ', error);
+        };
+
+        // Chart.js setup
+        const ctx = document.getElementById('metricsChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], // X-axis will represent iterations
+                datasets: [{
+                    label: 'MSE_A',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1,
+                    data: [] // Y-axis data points
+                },
+                {
+                    label: 'MAE_A',
+                    borderColor: 'rgba(192, 75, 75, 1)',
+                    borderWidth: 1,
+                    data: [] // Y-axis data points
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Iterations' }},
+                    y: { title: { display: true, text: 'Error' }}
+                }
+            }
         });
+
+        // Handle incoming WebSocket messages and update the chart
+        socket.onmessage = function (event) {
+            const metrics = JSON.parse(event.data);
+            chart.data.labels.push(metrics.iteration);
+            chart.data.datasets[0].data.push(metrics.mse_a);
+            chart.data.datasets[1].data.push(metrics.mae_a);
+            chart.update();
+        };
+
+        socket.onclose = function() {
+            console.log('WebSocket connection closed');
+        };
     </script>
 </body>
 </html>

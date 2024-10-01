@@ -1,7 +1,4 @@
 // src/api/mod.rs
-
-use serde::Deserialize;
-use serde::Serialize;
 use std::sync::Mutex;
 use crate::models::Metrics;
 
@@ -13,4 +10,4 @@ pub struct AppStateStruct {
 /// Re-export handlers
 pub mod handlers;
 
-pub use handlers::get_metrics;
+// pub use handlers::get_metrics;

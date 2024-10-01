@@ -2,7 +2,6 @@
 
 use crate::models::MarketData;
 use chrono::NaiveDate;
-use serde::Deserialize;
 use std::env;
 
 /// Fetches Forex data from the Alpha Vantage API

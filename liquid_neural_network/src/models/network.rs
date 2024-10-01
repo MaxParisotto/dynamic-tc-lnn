@@ -46,7 +46,7 @@ impl LiquidNeuralNetwork {
     }
 
     /// Trains the network with the given input, target, time step, and learning rate.
-    pub fn train(&mut self, input: &[f64], target: f64, dt: f64, lr: f64) {
+    pub fn train(&mut self, input: &[f64], target: f64, _dt: f64, lr: f64) {
         for (i, neuron) in self.neurons.iter_mut().enumerate() {
             // Calculate neuron's raw output
             let raw_output: f64 =
@@ -99,6 +99,7 @@ impl LiquidNeuralNetwork {
     }
 
     /// Loads the network state from a JSON file.
+    #[allow(dead_code)]
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let data = std::fs::read_to_string(path)?;
         let network = serde_json::from_str(&data)?;
@@ -114,6 +115,7 @@ fn relu(x: f64) -> f64 {
 }
 
 /// Sigmoid activation function
+#[allow(dead_code)]
 fn sigmoid(x: f64) -> f64 {
     1.0 / (1.0 + (-x).exp())
 }
