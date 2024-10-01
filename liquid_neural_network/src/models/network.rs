@@ -1,5 +1,3 @@
-// src/models/network.rs
-
 use serde::{Deserialize, Serialize};
 use rand::Rng;
 use rand::thread_rng;
@@ -17,6 +15,20 @@ pub struct Metrics {
     pub mae_c: f64,
     pub mse_meta: f64,
     pub mae_meta: f64,
+}
+
+impl Metrics {
+    /// Update metrics based on new values for each model
+    pub fn update_metrics(&mut self, mse_a: f64, mae_a: f64, mse_b: f64, mae_b: f64, mse_c: f64, mae_c: f64, mse_meta: f64, mae_meta: f64) {
+        self.mse_a = mse_a;
+        self.mae_a = mae_a;
+        self.mse_b = mse_b;
+        self.mae_b = mae_b;
+        self.mse_c = mse_c;
+        self.mae_c = mae_c;
+        self.mse_meta = mse_meta;
+        self.mae_meta = mae_meta;
+    }
 }
 
 /// A simple neuron model
@@ -74,6 +86,11 @@ impl LiquidNeuralNetwork {
         }
     }
 
+    /// Adjusts the learning rate based on a decay factor and the current iteration.
+    pub fn adjust_learning_rate(&self, initial_lr: f64, decay: f64, iteration: usize) -> f64 {
+        initial_lr * (1.0 / (1.0 + decay * iteration as f64))
+    }
+
     /// Generates a prediction based on the current state of the network.
     pub fn predict(&self) -> f64 {
         // Average the states of all neurons as the prediction
@@ -91,6 +108,19 @@ impl LiquidNeuralNetwork {
         output
     }
 
+    /// Scales the number of neurons in the network dynamically.
+    pub fn scale_neurons(&mut self, new_size: usize, input_size: usize) {
+        let current_size = self.neurons.len();
+
+        if new_size > current_size {
+            for _ in 0..(new_size - current_size) {
+                self.neurons.push(Neuron::new(input_size));
+            }
+        } else if new_size < current_size {
+            self.neurons.truncate(new_size);
+        }
+    }
+
     /// Saves the network state to a file in JSON format.
     pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let serialized = serde_json::to_string(self)?;
@@ -99,7 +129,6 @@ impl LiquidNeuralNetwork {
     }
 
     /// Loads the network state from a JSON file.
-    #[allow(dead_code)]
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let data = std::fs::read_to_string(path)?;
         let network = serde_json::from_str(&data)?;
@@ -118,6 +147,13 @@ fn relu(x: f64) -> f64 {
 #[allow(dead_code)]
 fn sigmoid(x: f64) -> f64 {
     1.0 / (1.0 + (-x).exp())
+}
+
+/// Input normalization function to ensure training stability
+pub fn normalize_input(input: &[f64]) -> Vec<f64> {
+    let max = input.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let min = input.iter().cloned().fold(f64::INFINITY, f64::min);
+    input.iter().map(|x| (x - min) / (max - min)).collect()
 }
 
 /// A simple neuron implementation
