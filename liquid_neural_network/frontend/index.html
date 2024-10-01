@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic TC-LNN Frontend</title>
     <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@latest/dist/chart.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> <!-- Load Plotly.js -->
 </head>
 <body>
     <div class="page">
         <div class="page-wrapper">
             <div class="container-xl">
                 <h1>Training Metrics</h1>
-                <canvas id="metricsChart"></canvas>
+                <div id="metricsChart"></div> <!-- Changed from canvas to div for Plotly -->
             </div>
         </div>
     </div>
@@ -21,45 +21,38 @@
         // Connect to WebSocket
         const socket = new WebSocket("ws://127.0.0.1:8080/metrics_ws");
 
-        // Chart.js setup
-        const ctx = document.getElementById('metricsChart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [], // X-axis will represent iterations
-                datasets: [
-                    { label: 'MSE_A', borderColor: 'rgba(75, 192, 192, 1)', data: [] },
-                    { label: 'MAE_A', borderColor: 'rgba(192, 75, 75, 1)', data: [] },
-                    { label: 'MSE_B', borderColor: 'rgba(75, 75, 192, 1)', data: [] },
-                    { label: 'MAE_B', borderColor: 'rgba(192, 192, 75, 1)', data: [] },
-                    { label: 'MSE_C', borderColor: 'rgba(75, 192, 75, 1)', data: [] },
-                    { label: 'MAE_C', borderColor: 'rgba(192, 75, 192, 1)', data: [] },
-                    { label: 'MSE_Meta', borderColor: 'rgba(75, 75, 75, 1)', data: [] },
-                    { label: 'MAE_Meta', borderColor: 'rgba(192, 192, 192, 1)', data: [] }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { title: { display: true, text: 'Iterations' }},
-                    y: { title: { display: true, text: 'Error' }}
-                }
-            }
-        });
+        // Initial Plotly.js setup
+        const layout = {
+            title: 'Training Metrics',
+            xaxis: { title: 'Iterations' },
+            yaxis: { title: 'Error' },
+        };
+
+        const data = [
+            { x: [], y: [], mode: 'lines', name: 'MSE_A' },
+            { x: [], y: [], mode: 'lines', name: 'MAE_A' },
+            { x: [], y: [], mode: 'lines', name: 'MSE_B' },
+            { x: [], y: [], mode: 'lines', name: 'MAE_B' },
+            { x: [], y: [], mode: 'lines', name: 'MSE_C' },
+            { x: [], y: [], mode: 'lines', name: 'MAE_C' },
+            { x: [], y: [], mode: 'lines', name: 'MSE_Meta' },
+            { x: [], y: [], mode: 'lines', name: 'MAE_Meta' },
+        ];
+
+        Plotly.newPlot('metricsChart', data, layout);
 
         // Handle incoming WebSocket messages and update the chart
         socket.onmessage = function (event) {
             const metrics = JSON.parse(event.data);
-            chart.data.labels.push(metrics.iteration);  // Add iteration to the chart
-            chart.data.datasets[0].data.push(metrics.mse_a);  // Update MSE_A
-            chart.data.datasets[1].data.push(metrics.mae_a);  // Update MAE_A
-            chart.data.datasets[2].data.push(metrics.mse_b);  // Update MSE_B
-            chart.data.datasets[3].data.push(metrics.mae_b);  // Update MAE_B
-            chart.data.datasets[4].data.push(metrics.mse_c);  // Update MSE_C
-            chart.data.datasets[5].data.push(metrics.mae_c);  // Update MAE_C
-            chart.data.datasets[6].data.push(metrics.mse_meta);  // Update MSE_Meta
-            chart.data.datasets[7].data.push(metrics.mae_meta);  // Update MAE_Meta
-            chart.update();  // Refresh the chart with new data
+
+            const update = {
+                x: [[metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], 
+                    [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration]],
+                y: [[metrics.mse_a], [metrics.mae_a], [metrics.mse_b], [metrics.mae_b], 
+                    [metrics.mse_c], [metrics.mae_c], [metrics.mse_meta], [metrics.mae_meta]],
+            };
+
+            Plotly.extendTraces('metricsChart', update, [0, 1, 2, 3, 4, 5, 6, 7]);
         };
 
         // WebSocket connection event handlers
