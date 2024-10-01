@@ -13,20 +13,19 @@ pub struct AppStateStruct {
 
 // WebSocket actor for handling real-time metrics updates
 pub struct MetricsWebSocket {
-    pub app_state: web::Data<AppStateStruct>,  // Add application state inside the WebSocket
+    pub app_state: web::Data<AppStateStruct>,  // Add app_state to WebSocket actor
 }
 
 impl Actor for MetricsWebSocket {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // Set up interval to send metrics every 5 seconds
-        let app_state_clone = self.app_state.clone(); // Clone the app state for use inside the interval
-
-        ctx.run_interval(std::time::Duration::from_secs(5), move |_, ctx| {
-            let metrics = app_state_clone.metrics.lock().unwrap();  // Get actual metrics from app state
-
-            let serialized_metrics = serde_json::to_string(&*metrics).unwrap();  // Serialize the metrics
+        let app_state = self.app_state.clone();  // Clone the app_state for use inside the closure
+        
+        ctx.run_interval(std::time::Duration::from_secs(5), move |_act, ctx| {
+            let metrics = app_state.metrics.lock().unwrap();  // Access actual metrics
+            
+            let serialized_metrics = serde_json::to_string(&*metrics).unwrap();
             ctx.text(serialized_metrics);  // Send real-time metrics to the frontend
         });
     }
@@ -46,7 +45,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MetricsWebSocket 
 
 // WebSocket route handler to establish a WebSocket connection
 async fn metrics_ws(req: HttpRequest, stream: web::Payload, app_state: web::Data<AppStateStruct>) -> Result<HttpResponse, Error> {
-    ws::start(MetricsWebSocket { app_state }, &req, stream)
+    ws::start(
+        MetricsWebSocket { app_state: app_state.clone() },  // Pass the app_state to the WebSocket actor
+        &req, 
+        stream
+    )
 }
 
 // Function to run the Actix web server

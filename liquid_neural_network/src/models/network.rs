@@ -19,6 +19,7 @@ pub struct Metrics {
 
 impl Metrics {
     /// Update metrics based on new values for each model
+    #[allow(dead_code)]
     pub fn update_metrics(&mut self, mse_a: f64, mae_a: f64, mse_b: f64, mae_b: f64, mse_c: f64, mae_c: f64, mse_meta: f64, mae_meta: f64) {
         self.mse_a = mse_a;
         self.mae_a = mae_a;
@@ -87,6 +88,7 @@ impl LiquidNeuralNetwork {
     }
 
     /// Adjusts the learning rate based on a decay factor and the current iteration.
+    #[allow(dead_code)]
     pub fn adjust_learning_rate(&self, initial_lr: f64, decay: f64, iteration: usize) -> f64 {
         initial_lr * (1.0 / (1.0 + decay * iteration as f64))
     }
@@ -109,6 +111,7 @@ impl LiquidNeuralNetwork {
     }
 
     /// Scales the number of neurons in the network dynamically.
+    #[allow(dead_code)]
     pub fn scale_neurons(&mut self, new_size: usize, input_size: usize) {
         let current_size = self.neurons.len();
 
@@ -129,6 +132,7 @@ impl LiquidNeuralNetwork {
     }
 
     /// Loads the network state from a JSON file.
+    #[allow(dead_code)]
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let data = std::fs::read_to_string(path)?;
         let network = serde_json::from_str(&data)?;
@@ -150,6 +154,7 @@ fn sigmoid(x: f64) -> f64 {
 }
 
 /// Input normalization function to ensure training stability
+#[allow(dead_code)]
 pub fn normalize_input(input: &[f64]) -> Vec<f64> {
     let max = input.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let min = input.iter().cloned().fold(f64::INFINITY, f64::min);

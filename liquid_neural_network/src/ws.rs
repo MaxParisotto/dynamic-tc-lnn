@@ -25,6 +25,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MetricsWebSocket 
 }
 
 // Function to start the WebSocket connection
+#[allow(dead_code)]
 pub async fn metrics_ws(req: HttpRequest, stream: actix_web::web::Payload) -> Result<HttpResponse, Error> {
     ws::start(MetricsWebSocket {}, &req, stream)
 }

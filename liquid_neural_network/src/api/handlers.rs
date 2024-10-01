@@ -19,6 +19,7 @@ pub struct ApiResponse {
 }
 
 /// Handler for the /metrics endpoint
+#[allow(dead_code)]
 pub async fn get_metrics(data: web::Data<AppStateStruct>) -> impl Responder {
     let metrics = data.metrics.lock().unwrap();
 
