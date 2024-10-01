@@ -11,7 +11,7 @@ mod ws;
 mod models;
 mod api;
 mod utils;
-mod server;  // Import the server module
+mod server;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -127,7 +127,7 @@ async fn main() -> std::io::Result<()> {
 
     info!("Training loop completed.");
 
-    // Start the Actix-web server (moved to a separate module)
+    // Start the Actix-web server
     server::run_server(app_state).await
 }
 

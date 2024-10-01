@@ -21,13 +21,14 @@
         // Connect to WebSocket
         const socket = new WebSocket("ws://127.0.0.1:8080/metrics_ws");
 
-        // Setup Plotly plot
+        // Setup Plotly plot layout
         const layout = {
             title: 'Training Metrics',
             xaxis: { title: 'Iterations' },
             yaxis: { title: 'Error' }
         };
 
+        // Create traces for MSE and MAE for models A, B, C, and Meta
         const trace1 = { x: [], y: [], mode: 'lines', name: 'MSE_A' };
         const trace2 = { x: [], y: [], mode: 'lines', name: 'MAE_A' };
         const trace3 = { x: [], y: [], mode: 'lines', name: 'MSE_B' };
@@ -39,12 +40,16 @@
 
         const data = [trace1, trace2, trace3, trace4, trace5, trace6, trace7, trace8];
 
+        // Plot the initial empty chart
         Plotly.newPlot('metricsChart', data, layout);
 
         // Handle incoming WebSocket messages and update Plotly plot
         socket.onmessage = function(event) {
             const metrics = JSON.parse(event.data);
             
+            // Log incoming data for debugging
+            console.log("Received metrics:", metrics);
+
             // Push new metrics data to each trace
             Plotly.extendTraces('metricsChart', {
                 x: [[metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration]],
@@ -64,7 +69,7 @@
         };
 
         socket.onerror = function(error) {
-            console.log("WebSocket error:", error);
+            console.error("WebSocket error:", error);
         };
 
         socket.onclose = function() {
