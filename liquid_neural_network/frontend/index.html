@@ -2,115 +2,74 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Metrics Visualization</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Dynamic TC-LNN Frontend</title>
+    <!-- Tabler Core CSS -->
+    <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler.min.css">
+    <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler-flags.min.css">
+    <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler-payments.min.css">
+    <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler-vendors.min.css">
 </head>
 <body>
-    <h1>Real-Time Metrics Visualization</h1>
-    <canvas id="mseChart" width="800" height="400"></canvas>
-    <canvas id="maeChart" width="800" height="400"></canvas>
+    <div class="page">
+        <div class="page-wrapper">
+            <div class="container-xl">
+                <div class="page-header">
+                    <h1 class="page-title">Dynamic TC-LNN Dashboard</h1>
+                    <div class="page-subtitle">Real-time metrics fetched from the Rust backend</div>
+                </div>
+                
+                <!-- Card to display metrics -->
+                <div class="row row-cards">
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h3 class="card-title">Metrics</h3>
+                                <p>Click below to fetch real-time metrics.</p>
+                                <button class="btn btn-primary" id="fetch-data">Fetch Data</button>
+                                <div id="data-output" class="mt-3">
+                                    <div id="metrics-placeholder">Metrics will appear here...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Display a loading spinner while fetching data -->
+                <div id="loading-spinner" class="spinner-border text-primary" style="display: none;" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                
+                <!-- Add additional sections or cards here for future features -->
+            </div>
+        </div>
+    </div>
 
+    <!-- Tabler Core JS -->
+    <script src="node_modules/@tabler/core/dist/js/tabler.min.js"></script>
+    
+    <!-- Add custom JavaScript -->
     <script>
-        const mseCtx = document.getElementById('mseChart').getContext('2d');
-        const maeCtx = document.getElementById('maeChart').getContext('2d');
-
-        const mseChart = new Chart(mseCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'MSE',
-                    data: [],
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    fill: true,
-                }]
-            },
-            options: {
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Iteration'
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'MSE'
-                        }
-                    }
-                }
-            }
+        document.getElementById('fetch-data').addEventListener('click', () => {
+            const dataOutput = document.getElementById('data-output');
+            const spinner = document.getElementById('loading-spinner');
+            spinner.style.display = 'block'; // Show spinner during fetch
+            dataOutput.innerHTML = ''; // Clear previous data
+            
+            fetch('http://127.0.0.1:8080/metrics')  // Replace with your Rust backend API endpoint
+                .then(response => response.json())
+                .then(data => {
+                    spinner.style.display = 'none'; // Hide spinner once data is fetched
+                    dataOutput.innerHTML = `
+                        <p><strong>MSE:</strong> ${data.mse}</p>
+                        <p><strong>MAE:</strong> ${data.mae}</p>
+                    `;
+                })
+                .catch(err => {
+                    spinner.style.display = 'none'; // Hide spinner if there's an error
+                    dataOutput.innerHTML = `<p class="text-danger">Error fetching data: ${err}</p>`;
+                });
         });
-
-        const maeChart = new Chart(maeCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'MAE',
-                    data: [],
-                    borderColor: 'rgba(153, 102, 255, 1)',
-                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
-                    fill: true,
-                }]
-            },
-            options: {
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Iteration'
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'MAE'
-                        }
-                    }
-                }
-            }
-        });
-
-        // Function to fetch metrics from the API
-        async function fetchMetrics() {
-            try {
-                const response = await fetch('http://127.0.0.1:8080/metrics');
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error('Error fetching metrics:', error);
-                return null;
-            }
-        }
-
-        // Function to update charts
-        async function updateCharts() {
-            const metrics = await fetchMetrics();
-            if (metrics) {
-                const { iteration, mse, mae } = metrics;
-
-                // Update MSE Chart
-                mseChart.data.labels.push(iteration);
-                mseChart.data.datasets[0].data.push(mse);
-                mseChart.update();
-
-                // Update MAE Chart
-                maeChart.data.labels.push(iteration);
-                maeChart.data.datasets[0].data.push(mae);
-                maeChart.update();
-            }
-        }
-
-        // Initial chart update
-        updateCharts();
-
-        // Update charts every second
-        setInterval(updateCharts, 1000);
     </script>
 </body>
 </html>

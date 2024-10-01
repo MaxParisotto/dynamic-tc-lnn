@@ -21,3 +21,6 @@ Cargo.lock
 #.idea/
 
 .env
+
+/liquid_neural_network/frontend/node_modules/
+.DS_Store

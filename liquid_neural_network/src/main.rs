@@ -1,15 +1,12 @@
-// src/main.rs
-
-use actix_web::{web, App, HttpServer};
+use actix_cors::Cors;
+use actix_web::{web, App, HttpServer, Responder};
 use dotenv::dotenv;
-use log::{error, info}; // Removed 'debug' as it's unused in this file
+use log::{error, info};
 use std::sync::Mutex;
-use utils::{
-    calculate_features, calculate_mae, calculate_mse, fetch_forex_data, normalize_features_targets,
-};
+use utils::{calculate_features, calculate_mae, calculate_mse, fetch_forex_data, normalize_features_targets};
 use models::{LiquidNeuralNetwork, Metrics};
 use api::{get_metrics, AppStateStruct};
-use rand::prelude::SliceRandom; // Imported SliceRandom for shuffle method
+use rand::prelude::SliceRandom;
 
 mod models;
 mod api;
@@ -17,12 +14,13 @@ mod utils;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Load environment variables from .env file
+    // Load environment variables from the .env file
     dotenv().ok();
-    // Initialize the logger
+    
+    // Initialize logging
     env_logger::init();
-
-    // Initialize metrics
+    
+    // Initialize Metrics and Shared State
     let metrics = Metrics {
         iteration: 0,
         mse_a: 0.0,
@@ -35,7 +33,6 @@ async fn main() -> std::io::Result<()> {
         mae_meta: 0.0,
     };
 
-    // Instantiate AppStateStruct from the api module
     let app_state = web::Data::new(AppStateStruct {
         metrics: Mutex::new(metrics),
     });
@@ -55,31 +52,28 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    // Calculate features and normalize
+    // Calculate and normalize features
     let features_targets = calculate_features(&market_data);
     let (mut normalized_features, normalized_targets) = normalize_features_targets(&features_targets);
 
     info!("Calculated and normalized features.");
 
-    // Initialize models
-    let input_size = normalized_features[0].len(); // Adjust based on actual features
-    let initial_neurons = 10; // Example number of neurons
+    // Initialize Models
+    let input_size = normalized_features[0].len();
+    let initial_neurons = 10;
 
     let mut model_a = LiquidNeuralNetwork::new(input_size, initial_neurons);
     let mut model_b = LiquidNeuralNetwork::new(input_size, initial_neurons);
     let mut model_c = LiquidNeuralNetwork::new(input_size, initial_neurons);
-    let mut meta_model = LiquidNeuralNetwork::new(3, initial_neurons); // Meta-model with 3 inputs
+    let mut meta_model = LiquidNeuralNetwork::new(3, initial_neurons);
 
     info!("Initialized all models.");
 
-    // Initialize history for plotting or further analysis (optional)
-    let mut metrics_history = Vec::new();
-
-    // Training loop
+    // Training Loop
     for iteration in 1..=100 {
         info!("Starting iteration {}", iteration);
 
-        // Shuffle data each iteration to ensure random order
+        // Shuffle data
         let mut combined: Vec<(&Vec<f64>, &f64)> =
             normalized_features.iter().zip(normalized_targets.iter()).collect();
         combined.shuffle(&mut rand::thread_rng());
@@ -99,16 +93,16 @@ async fn main() -> std::io::Result<()> {
             model_b.train(features, **target, 0.1, 0.01);
             model_c.train(features, **target, 0.1, 0.01);
 
-            // Generate predictions
+            // Predict outputs
             let pred_a = model_a.predict();
             let pred_b = model_b.predict();
             let pred_c = model_c.predict();
 
-            // Aggregate predictions for meta-model (simple average)
+            // Meta-model prediction (aggregate)
             let meta_input = vec![pred_a, pred_b, pred_c];
             let pred_meta = meta_model.predict_with_input(&meta_input);
 
-            // Calculate errors
+            // Error calculation
             let mse_a = calculate_mse(&pred_a, target);
             let mae_a = calculate_mae(&pred_a, target);
 
@@ -132,7 +126,7 @@ async fn main() -> std::io::Result<()> {
             total_mae_meta += mae_meta;
         }
 
-        // Calculate average errors for this iteration
+        // Calculate average errors
         let data_len = normalized_features.len() as f64;
         let avg_mse_a = total_mse_a / data_len;
         let avg_mae_a = total_mae_a / data_len;
@@ -143,7 +137,7 @@ async fn main() -> std::io::Result<()> {
         let avg_mse_meta = total_mse_meta / data_len;
         let avg_mae_meta = total_mae_meta / data_len;
 
-        // Update metrics
+        // Update metrics in shared state
         {
             let mut metrics = app_state.metrics.lock().unwrap();
             metrics.iteration = iteration;
@@ -157,29 +151,12 @@ async fn main() -> std::io::Result<()> {
             metrics.mae_meta = avg_mae_meta;
         }
 
-        // Optionally, store metrics for plotting
-        metrics_history.push(app_state.metrics.lock().unwrap().clone());
-
-        info!(
-            "Iteration {}: MSE_A={:.6}, MAE_A={:.6}, MSE_B={:.6}, MAE_B={:.6}, MSE_C={:.6}, MAE_C={:.6}, MSE_Meta={:.6}, MAE_Meta={:.6}",
-            iteration, avg_mse_a, avg_mae_a, avg_mse_b, avg_mae_b, avg_mse_c, avg_mae_c, avg_mse_meta, avg_mae_meta
-        );
+        info!("Iteration {}: MSE_A={:.6}, MAE_A={:.6}, MSE_B={:.6}, MAE_B={:.6}, MSE_C={:.6}, MAE_C={:.6}, MSE_Meta={:.6}, MAE_Meta={:.6}",
+            iteration, avg_mse_a, avg_mae_a, avg_mse_b, avg_mae_b, avg_mse_c, avg_mae_c, avg_mse_meta, avg_mae_meta);
 
         // Periodically save models
         if iteration % 10 == 0 {
-            if let Err(e) = model_a.save_to_file("model_a.json") {
-                error!("Failed to save Model A: {}", e);
-            }
-            if let Err(e) = model_b.save_to_file("model_b.json") {
-                error!("Failed to save Model B: {}", e);
-            }
-            if let Err(e) = model_c.save_to_file("model_c.json") {
-                error!("Failed to save Model C: {}", e);
-            }
-            if let Err(e) = meta_model.save_to_file("meta_model.json") {
-                error!("Failed to save Meta Model: {}", e);
-            }
-            info!("Saved models at iteration {}", iteration);
+            save_models(&model_a, &model_b, &model_c, &meta_model, iteration);
         }
     }
 
@@ -188,10 +165,28 @@ async fn main() -> std::io::Result<()> {
     // Start Actix-web server
     HttpServer::new(move || {
         App::new()
+            .wrap(Cors::permissive()) // Enable CORS for frontend-backend interaction
             .app_data(app_state.clone())
-            .route("/metrics", web::get().to(get_metrics))
+            .route("/metrics", web::get().to(get_metrics)) // Metrics API
     })
     .bind(("127.0.0.1", 8080))?
     .run()
     .await
+}
+
+// Helper function to save models
+fn save_models(model_a: &LiquidNeuralNetwork, model_b: &LiquidNeuralNetwork, model_c: &LiquidNeuralNetwork, meta_model: &LiquidNeuralNetwork, iteration: usize) {
+    if let Err(e) = model_a.save_to_file("model_a.json") {
+        error!("Failed to save Model A at iteration {}: {}", iteration, e);
+    }
+    if let Err(e) = model_b.save_to_file("model_b.json") {
+        error!("Failed to save Model B at iteration {}: {}", iteration, e);
+    }
+    if let Err(e) = model_c.save_to_file("model_c.json") {
+        error!("Failed to save Model C at iteration {}: {}", iteration, e);
+    }
+    if let Err(e) = meta_model.save_to_file("meta_model.json") {
+        error!("Failed to save Meta Model at iteration {}: {}", iteration, e);
+    }
+    info!("Saved models at iteration {}", iteration);
 }
