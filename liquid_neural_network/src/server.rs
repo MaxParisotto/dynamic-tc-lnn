@@ -59,7 +59,8 @@ pub async fn run_server(app_state: web::Data<AppStateStruct>) -> std::io::Result
             .wrap(Cors::permissive())  // Enable permissive CORS for frontend-backend interaction
             .app_data(app_state.clone())  // Pass application state
             .route("/metrics_ws", web::get().to(metrics_ws))  // Route for WebSocket connection
-            .service(fs::Files::new("/static", "./frontend/static"))  // Serve static assets
+            .service(fs::Files::new("/static", "./frontend/static")) // Serve static assets
+            .service(fs::Files::new("/static", "./frontend")) // Serve static assets
             .service(fs::Files::new("/", "./frontend").index_file("index.html"))  // Serve index.html
     })
     .bind(("127.0.0.1", 8080))?

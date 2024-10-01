@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic TC-LNN Frontend</title>
     <link rel="stylesheet" href="node_modules/@tabler/core/dist/css/tabler.min.css">
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> <!-- Load Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
     <div class="page">
         <div class="page-wrapper">
             <div class="container-xl">
                 <h1>Training Metrics</h1>
-                <div id="metricsChart"></div> <!-- Changed from canvas to div for Plotly -->
+                <div id="metricsChart"></div>
             </div>
         </div>
     </div>
@@ -21,50 +21,53 @@
         // Connect to WebSocket
         const socket = new WebSocket("ws://127.0.0.1:8080/metrics_ws");
 
-        // Initial Plotly.js setup
+        // Setup Plotly plot
         const layout = {
             title: 'Training Metrics',
             xaxis: { title: 'Iterations' },
-            yaxis: { title: 'Error' },
+            yaxis: { title: 'Error' }
         };
 
-        const data = [
-            { x: [], y: [], mode: 'lines', name: 'MSE_A' },
-            { x: [], y: [], mode: 'lines', name: 'MAE_A' },
-            { x: [], y: [], mode: 'lines', name: 'MSE_B' },
-            { x: [], y: [], mode: 'lines', name: 'MAE_B' },
-            { x: [], y: [], mode: 'lines', name: 'MSE_C' },
-            { x: [], y: [], mode: 'lines', name: 'MAE_C' },
-            { x: [], y: [], mode: 'lines', name: 'MSE_Meta' },
-            { x: [], y: [], mode: 'lines', name: 'MAE_Meta' },
-        ];
+        const trace1 = { x: [], y: [], mode: 'lines', name: 'MSE_A' };
+        const trace2 = { x: [], y: [], mode: 'lines', name: 'MAE_A' };
+        const trace3 = { x: [], y: [], mode: 'lines', name: 'MSE_B' };
+        const trace4 = { x: [], y: [], mode: 'lines', name: 'MAE_B' };
+        const trace5 = { x: [], y: [], mode: 'lines', name: 'MSE_C' };
+        const trace6 = { x: [], y: [], mode: 'lines', name: 'MAE_C' };
+        const trace7 = { x: [], y: [], mode: 'lines', name: 'MSE_Meta' };
+        const trace8 = { x: [], y: [], mode: 'lines', name: 'MAE_Meta' };
+
+        const data = [trace1, trace2, trace3, trace4, trace5, trace6, trace7, trace8];
 
         Plotly.newPlot('metricsChart', data, layout);
 
-        // Handle incoming WebSocket messages and update the chart
-        socket.onmessage = function (event) {
+        // Handle incoming WebSocket messages and update Plotly plot
+        socket.onmessage = function(event) {
             const metrics = JSON.parse(event.data);
+            
+            // Push new metrics data to each trace
+            Plotly.extendTraces('metricsChart', {
+                x: [[metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration]],
+                y: [[metrics.mse_a], [metrics.mae_a], [metrics.mse_b], [metrics.mae_b], [metrics.mse_c], [metrics.mae_c], [metrics.mse_meta], [metrics.mae_meta]]
+            }, [0, 1, 2, 3, 4, 5, 6, 7]);
 
-            const update = {
-                x: [[metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration], 
-                    [metrics.iteration], [metrics.iteration], [metrics.iteration], [metrics.iteration]],
-                y: [[metrics.mse_a], [metrics.mae_a], [metrics.mse_b], [metrics.mae_b], 
-                    [metrics.mse_c], [metrics.mae_c], [metrics.mse_meta], [metrics.mae_meta]],
-            };
-
-            Plotly.extendTraces('metricsChart', update, [0, 1, 2, 3, 4, 5, 6, 7]);
+            // Limit data points to a maximum of 100 for display
+            const maxPoints = 100;
+            Plotly.relayout('metricsChart', {
+                xaxis: { range: [Math.max(0, metrics.iteration - maxPoints), metrics.iteration] }
+            });
         };
 
         // WebSocket connection event handlers
-        socket.onopen = function () {
+        socket.onopen = function() {
             console.log("WebSocket connection established.");
         };
 
-        socket.onerror = function (error) {
+        socket.onerror = function(error) {
             console.log("WebSocket error:", error);
         };
 
-        socket.onclose = function () {
+        socket.onclose = function() {
             console.log("WebSocket connection closed.");
         };
     </script>
